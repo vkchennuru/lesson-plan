@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Academic Plan Generator</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
+    <script src="https://unpkg.com/docx@8.2.2/build/index.browser.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+</head>
+<body class="bg-gray-50 min-h-screen p-8">
+    <div class="max-w-3xl mx-auto bg-white p-8 rounded-xl shadow-md">
+        <h1 class="text-2xl font-bold text-blue-800 mb-6">Syllabus to Lesson Plan Converter</h1>
+        
+        <div class="space-y-4">
+            <div>
+                <label class="block text-sm font-medium text-gray-700 text-red-500">Step 1: Enter Gemini API Key</label>
+                <input type="password" id="apiKey" class="w-full p-2 border rounded mt-1" placeholder="paste key here...">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700">Step 2: Upload Syllabus PDF</label>
+                <input type="file" id="pdfUpload" accept=".pdf" class="w-full p-2 border border-dashed rounded mt-1">
+            </div>
+
+            <button onclick="processSyllabus()" id="btnProcess" class="w-full bg-blue-600 text-white py-3 rounded-lg font-semibold hover:bg-blue-700 transition">
+                Generate Documents
+            </button>
+        </div>
+
+        <div id="status" class="mt-6 text-sm text-gray-600 italic"></div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
