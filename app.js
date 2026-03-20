@@ -34,19 +34,48 @@ async function extractTextFromPDF(file) {
 }
 
 async function callGemini(syllabusText, key) {
-    const prompt = `Convert this syllabus into a JSON array for a lesson plan. 
-    Format: [{week: 1, topic: "", objective: "", synopsis: "", activity: ""}] 
-    Syllabus: ${syllabusText}`;
+    // 1. Use a more modern model for 2026 (Flash is faster and handles more text)
+    const model = "gemini-1.5-flash"; 
+    
+    const prompt = `Extract the syllabus topics from the following text and return ONLY a JSON array. 
+    Format: [{"week": 1, "topic": "Topic Name", "objective": "Goal", "synopsis": "Summary", "activity": "Lab/Quiz"}]
+    Syllabus Text: ${syllabusText.substring(0, 30000)}`; // Truncate if extremely long
 
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${key}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
-    });
+    try {
+        const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                contents: [{ parts: [{ text: prompt }] }],
+                // 2. Add Safety Settings to prevent the "Stuck" state
+                safetySettings: [
+                    { category: "HARM_CATEGORY_HARASSMENT", threshold: "BLOCK_NONE" },
+                    { category: "HARM_CATEGORY_HATE_SPEECH", threshold: "BLOCK_NONE" },
+                    { category: "HARM_CATEGORY_SEXUALLY_EXPLICIT", threshold: "BLOCK_NONE" },
+                    { category: "HARM_CATEGORY_DANGEROUS_CONTENT", threshold: "BLOCK_NONE" }
+                ],
+                generationConfig: {
+                    temperature: 0.1, // Keep it factual/deterministic
+                    responseMimeType: "application/json" // Force JSON output
+                }
+            })
+        });
 
-    const result = await response.json();
-    const cleanJson = result.candidates[0].content.parts[0].text.replace(/```json|```/g, "");
-    return JSON.parse(cleanJson);
+        if (!response.ok) {
+            const errorDetails = await response.json();
+            throw new Error(`API Error: ${errorDetails.error.message}`);
+        }
+
+        const result = await response.json();
+        const content = result.candidates[0].content.parts[0].text;
+        
+        return JSON.parse(content);
+    } catch (error) {
+        console.error("Gemini Error:", error);
+        alert("Error: " + error.message);
+        document.getElementById('status').innerText = "Failed at AI step.";
+        throw error;
+    }
 }
 
 async function createCurricularDoc(data) {
