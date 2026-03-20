@@ -2,114 +2,155 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Syllabus Plan Generator</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Academic Proforma Generator - S.K.R. & S.K.R. Govt. College</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.min.js"></script>
     <script src="https://unpkg.com/docx@8.2.2/build/index.browser.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 </head>
-<body class="bg-slate-100 p-5 font-sans">
-    <div class="max-w-2xl mx-auto bg-white p-8 rounded-2xl shadow-xl">
-        <h2 class="text-2xl font-bold text-slate-800 mb-2 border-b pb-2">Academic Proforma Generator</h2>
-        <p class="text-sm text-slate-500 mb-6 italic text-blue-600">S.K.R. & S.K.R. Govt. College for Men (A), Kadapa</p>
+<body class="bg-slate-50 min-h-screen flex items-center justify-center p-4 font-sans">
 
-        <div class="space-y-5">
+    <div class="max-w-xl w-full bg-white shadow-2xl rounded-3xl overflow-hidden border border-slate-200">
+        <div class="bg-blue-700 p-6 text-white">
+            <h1 class="text-2xl font-bold">Academic Proforma Generator</h1>
+            <p class="text-blue-100 text-sm opacity-80">S.K.R. & S.K.R. Govt. College for Men (A), Kadapa</p>
+        </div>
+
+        <div class="p-8 space-y-6">
             <div>
-                <label class="block text-xs font-bold uppercase text-slate-400">Gemini API Key</label>
-                <input type="password" id="apiKey" class="w-full border-2 border-slate-200 p-3 rounded-lg focus:border-blue-500 outline-none transition" placeholder="Paste your API key here">
+                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Gemini API Key</label>
+                <input type="password" id="apiKey" 
+                    class="w-full px-4 py-3 rounded-xl border-2 border-slate-100 focus:border-blue-500 focus:ring-4 focus:ring-blue-50 outline-none transition-all" 
+                    placeholder="Paste your Alza... key here">
             </div>
 
             <div>
-                <label class="block text-xs font-bold uppercase text-slate-400">Upload Syllabus (PDF)</label>
-                <input type="file" id="pdfFile" accept="application/pdf" class="w-full border-2 border-dashed border-slate-200 p-4 rounded-lg bg-slate-50">
+                <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Upload Syllabus (PDF)</label>
+                <div class="relative border-2 border-dashed border-slate-200 rounded-xl p-4 bg-slate-50 hover:bg-slate-100 transition-colors">
+                    <input type="file" id="pdfFile" accept="application/pdf" class="w-full cursor-pointer opacity-0 absolute inset-0">
+                    <div class="text-center pointer-events-none">
+                        <span id="fileName" class="text-slate-600 font-medium">Click to select PDF file</span>
+                    </div>
+                </div>
             </div>
 
-            <button onclick="startProcessing()" id="goBtn" class="w-full bg-blue-600 text-white font-bold py-4 rounded-xl hover:bg-blue-700 active:scale-95 transition-all">
+            <button onclick="process()" id="mainBtn" 
+                class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-2xl shadow-lg shadow-blue-200 active:scale-[0.98] transition-all">
                 GENERATE DOCUMENTS
             </button>
 
-            <div id="log" class="text-sm font-mono p-4 bg-slate-800 text-green-400 rounded-lg hidden"></div>
+            <div id="statusBox" class="hidden rounded-xl p-4 font-mono text-sm border">
+                <div id="statusText"></div>
+            </div>
         </div>
     </div>
 
     <script>
+        // Initialize PDF.js
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.4.120/pdf.worker.min.js';
 
-        const log = document.getElementById('log');
-        const updateStatus = (msg) => { log.classList.remove('hidden'); log.innerText = "> " + msg; };
+        const statusBox = document.getElementById('statusBox');
+        const statusText = document.getElementById('statusText');
+        const fileNameDisp = document.getElementById('fileName');
 
-        async function startProcessing() {
+        // Show selected file name
+        document.getElementById('pdfFile').onchange = e => {
+            fileNameDisp.innerText = e.target.files[0]?.name || "Click to select PDF file";
+        };
+
+        function updateStatus(msg, isError = false) {
+            statusBox.classList.remove('hidden', 'bg-slate-900', 'text-green-400', 'bg-red-50', 'text-red-700', 'border-red-200');
+            if (isError) {
+                statusBox.classList.add('bg-red-50', 'text-red-700', 'border-red-200');
+                statusText.innerHTML = "❌ ERROR: " + msg;
+            } else {
+                statusBox.classList.add('bg-slate-900', 'text-green-400', 'border-slate-800');
+                statusText.innerHTML = "➜ " + msg;
+            }
+        }
+
+        async function process() {
             const file = document.getElementById('pdfFile').files[0];
-            const key = document.getElementById('apiKey').value;
+            const key = document.getElementById('apiKey').value.trim();
 
-            if (!file || !key) return alert("Missing File or API Key!");
+            if (!file || !key) return alert("Please provide both the API Key and the Syllabus PDF.");
 
             try {
-                updateStatus("Step 1: Reading PDF Content...");
+                updateStatus("Reading PDF content...");
                 const text = await extractText(file);
                 
-                updateStatus("Step 2: Analyzing with Gemini AI...");
-                const jsonData = await callGemini(text, key);
+                updateStatus("Consulting Gemini AI (1.5 Flash)...");
+                const jsonData = await getAIPlan(text, key);
 
-                updateStatus("Step 3: Generating DOCX Files...");
-                await generateDoc(jsonData);
+                updateStatus("Generating Word Document...");
+                await createWordDoc(jsonData);
                 
-                updateStatus("✅ COMPLETE: Files downloaded!");
-            } catch (e) {
-                updateStatus("❌ ERROR: " + e.message);
-                console.error(e);
+                updateStatus("Success! Check your downloads folder.");
+            } catch (err) {
+                updateStatus(err.message, true);
+                console.error(err);
             }
         }
 
         async function extractText(file) {
             const buffer = await file.arrayBuffer();
             const pdf = await pdfjsLib.getDocument(buffer).promise;
-            let str = "";
+            let content = "";
             for (let i = 1; i <= Math.min(pdf.numPages, 10); i++) {
                 const page = await pdf.getPage(i);
-                const content = await page.getTextContent();
-                str += content.items.map(item => item.str).join(" ");
+                const text = await page.getTextContent();
+                content += text.items.map(s => s.str).join(" ") + " ";
             }
-            return str;
+            if (!content.trim()) throw new Error("PDF seems empty or scanned. Try a text-based PDF.");
+            return content;
         }
 
-        async function callGemini(syllabusText, key) {
+        async function getAIPlan(syllabus, key) {
             const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
             
-            const prompt = `Convert the following syllabus text into a JSON array for a teaching plan.
-            IMPORTANT: Return ONLY the JSON. No markdown. No text. 
-            Format: [{"week":1, "topic":"Topic Title", "obj":"Objective", "syn":"Synopsis", "act":"Lab/Activity"}]
-            Text: ${syllabusText.substring(0, 15000)}`;
+            const payload = {
+                contents: [{
+                    parts: [{
+                        text: `Convert this syllabus into a JSON array for a lesson plan. 
+                        Return ONLY valid JSON. Format: [{"week":1, "topic":"Title", "obj":"Objective", "syn":"Summary", "act":"Activity"}]. 
+                        Syllabus: ${syllabus.substring(0, 20000)}`
+                    }]
+                }],
+                generationConfig: { responseMimeType: "application/json" }
+            };
 
             const response = await fetch(url, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: prompt }] }],
-                    generationConfig: { responseMimeType: "application/json" }
-                })
+                body: JSON.stringify(payload)
             });
 
-            if (!response.ok) throw new Error("API call failed. Check your key.");
-            const data = await response.json();
-            return JSON.parse(data.candidates[0].content.parts[0].text);
+            if (!response.ok) {
+                const error = await response.json();
+                throw new Error(error.error?.message || "API Rejected Key");
+            }
+
+            const result = await response.json();
+            const raw = result.candidates[0].content.parts[0].text;
+            return JSON.parse(raw);
         }
 
-        async function generateDoc(data) {
-            const { Document, Packer, Paragraph, Table, TableRow, TableCell, WidthType } = docx;
+        async function createWordDoc(data) {
+            const { Document, Packer, Paragraph, Table, TableRow, TableCell, WidthType, TextRun } = docx;
 
-            const tableRows = [
+            const rows = [
                 new TableRow({
-                    children: ["Week", "Topic", "Activity"].map(t => new TableCell({ 
-                        children: [new Paragraph({ text: t, bold: true })], 
-                        shading: { fill: "f0f0f0" } 
+                    children: ["Week", "Syllabus Topic", "Activity"].map(h => new TableCell({
+                        children: [new Paragraph({ children: [new TextRun({ text: h, bold: true })] })],
+                        shading: { fill: "F3F4F6" }
                     }))
                 }),
                 ...data.map(item => new TableRow({
                     children: [
                         new TableCell({ children: [new Paragraph(String(item.week))] }),
                         new TableCell({ children: [new Paragraph(item.topic)] }),
-                        new TableCell({ children: [new Paragraph(item.act)] })
+                        new TableCell({ children: [new Paragraph(item.act || "N/A")] })
                     ]
                 }))
             ];
@@ -117,8 +158,10 @@
             const doc = new Document({
                 sections: [{
                     children: [
-                        new Paragraph({ text: "SEMESTER CURRICULAR PLAN", heading: "Heading1" }),
-                        new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: tableRows })
+                        new Paragraph({ text: "PROFORMA FOR SEMESTER CURRICULAR PLAN", heading: "Heading1" }),
+                        new Paragraph({ text: "Commissionerate of Collegiate Education, A.P.", italic: true }),
+                        new Paragraph({ text: "" }), // Spacer
+                        new Table({ width: { size: 100, type: WidthType.PERCENTAGE }, rows: rows })
                     ]
                 }]
             });
